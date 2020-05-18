@@ -205,16 +205,20 @@
 
 (defun mask-metaball (win x y w h rnd)
   (declare (ignorable win w h))
-  (when (< rnd 0.55)
-    (loop for (mx my mr2 w) in (mask-data win)
+  (when (< rnd 0.6)
+    (loop with rmin = 10000
+          with wmin = 0.55
+          for (mx my mr2 w) in (mask-data win)
           for r2 = (+ (expt (- x mx -1/2) 2)
                       (expt (- y my -1/2) 2))
           for d = (/ mr2 r2)
           sum d into in
-          sum (* w d) into sw
+          when (< r2 rmin)
+            do (setf wmin w rmin r2)
           finally (return (or (and (> in 1.5)
                                    (< rnd 0.3))
-                              (> in 1.75))))))
+                              (and (< rnd wmin)
+                                   (> in 1.75)))))))
 
 
 (defun mask (win x y w h r)
@@ -255,15 +259,15 @@
           (loop with w = (float (w win))
                 with h = (float (h win))
                 with a = (* w h)
-                for r = (+ (min 40 (* w 1/10))
-                           (random (min 40 (* w 1/10))))
+                for r = (+ (min 10 (* (min w h) 1/10))
+                           (random (min 10 (* (min w h) 1/10))))
                 repeat 100
-                collect (list (+ r (random (- w (* r 2))))
-                              (+ r (random (- h (* r 2))))
+                collect (list (+ (* 2 r) (random (- w (* r 4))))
+                              (+ (* 2 r) (random (- h (* r 4))))
                               (expt (* r 1) 2)
-                              (+ 0.4 (random 0.3)))
+                              (+ 0.5 (random 0.1)))
                 sum (* 3.14 r r) into a2
-                while (< (/ a2 a) 0.5)))
+                while (< (/ a2 a) 0.30)))
     (let ((map (cave win)))
       (do-cells (map x y w h)
         (if (mask win x y w h (random 1.0))
@@ -273,11 +277,11 @@
         (if (numberp smooth)
             (loop repeat smooth
                   do (smooth map))
-            (loop repeat (print (a:clamp
-                                 (floor (- (* (log (* (w win) (h win))
-                                                   2))
-                                           3))
-                                 3 10))
+            (loop repeat (a:clamp
+                           (floor (- (* (log (* (w win) (h win))
+                                             2))
+                                     3))
+                           3 10)
                   do (smooth map)))))))
 
 
@@ -303,7 +307,9 @@
     (#\space
      (gen-map window))
     (#\d
-     (gen-map window :smooth nil))
+     (time
+      (gen-map window :smooth nil))
+     )
     (#\m
      (smooth (cave window)))
     (#\n
@@ -311,8 +317,10 @@
      (incf (seed window))
      (format t "seed => ~s~%" (seed window))
      (gen-map window))
+    (#\b
+     #++(time (loop for i below 10 do (setf (seed window) i) (gen-map window))))
     (#\s (setf (cave window)
-               (make-array '(20 20)
+               (make-array '(35 35)
                            :element-type 'bit :initial-element 0))
      (gen-map window))
     (#\l
@@ -322,7 +330,7 @@
      (gen-map window))
     (#\x
      (setf (cave window)
-           (make-array '(800 500)
+           (make-array '(300 300)
                        :element-type 'bit :initial-element 0))
      (time (gen-map window)))
     #++(#\m (setf *mouse* t))
